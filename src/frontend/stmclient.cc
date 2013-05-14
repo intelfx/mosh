@@ -409,9 +409,8 @@ bool STMClient::main( void )
   main_init();
 
   Agent::ProxyAgent agent( false, ! forward_agent );
-  if ( agent.active() ) {
-    agent.attach_oob( network->oob() );
-  }
+
+  agent.attach_oob(network->oob());
 
   /* prepare to poll for events */
   Select &sel = Select::get_instance();
@@ -438,9 +437,7 @@ bool STMClient::main( void )
       }
       sel.add_fd( STDIN_FILENO );
 
-      if ( agent.active() ) {
-	agent.pre_poll();
-      }
+      network->oob()->pre_poll();
 
       int active_fds = sel.select( wait_time );
       if ( active_fds < 0 ) {
@@ -470,7 +467,7 @@ bool STMClient::main( void )
 	  if ( !network->has_remote_addr() ) {
 	    break;
 	  } else {
-	    agent.shutdown_server();
+	    network->oob()->shutdown();
 	    if ( !network->shutdown_in_progress() ) {
 	      overlays.get_notification_engine().set_notification_string( wstring( L"Exiting..." ), true );
 	      network->start_shutdown();
@@ -497,7 +494,7 @@ bool STMClient::main( void )
           break;
         } else if ( !network->shutdown_in_progress() ) {
           overlays.get_notification_engine().set_notification_string( wstring( L"Signal received, shutting down..." ), true );
-	  agent.shutdown_server();
+	  network->oob()->shutdown();
           network->start_shutdown();
         }
       }
@@ -526,7 +523,7 @@ bool STMClient::main( void )
 	if ( timestamp() - network->get_latest_remote_state().timestamp > 15000 ) {
 	  if ( !network->shutdown_in_progress() ) {
 	    overlays.get_notification_engine().set_notification_string( wstring( L"Timed out waiting for server..." ), true );
-	    agent.shutdown_server();
+	    network->oob()->shutdown();
 	    network->start_shutdown();
 	  }
 	} else {
@@ -538,15 +535,11 @@ bool STMClient::main( void )
 	overlays.get_notification_engine().set_notification_string( L"" );
       }
 
-      if ( agent.active() ) {
-	agent.post_poll();
-      }
+      network->oob()->post_poll();
 
       network->tick();
 
-      if ( agent.active() ) {
-	agent.post_tick();
-      }
+      network->oob()->post_tick();
 
       const Network::NetworkException *exn = network->get_send_exception();
       if ( exn ) {
